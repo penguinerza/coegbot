@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Write .env.keys
-        run: echo "DOTENV_PRIVATE_KEY_PRODUCTION=${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}" > .env.keys
+        run: echo "DOTENV_PRIVATE_KEY_PROD=${{ secrets.DOTENV_PRIVATE_KEY_PROD }}" > .env.keys
 
       - name: Build & deploy
         run: |
