@@ -6,9 +6,11 @@ on:
 
 permissions:
   contents: read
+
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: self-hosted
@@ -18,9 +20,7 @@ jobs:
 
       - name: Write .env.keys
         run: |
-          cat > .env.keys << 'EOF'
-          DOTENV_PRIVATE_KEY_PRODUCTION=${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}
-          EOF
+          echo "DOTENV_PRIVATE_KEY_PROD=${{ secrets.DOTENV_PRIVATE_KEY_PROD }}" > .env.keys
           chmod 600 .env.keys
 
       - name: Build & deploy

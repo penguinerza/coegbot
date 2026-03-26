@@ -19,7 +19,7 @@ Buka repo → **Settings → Secrets and variables → Actions → New repositor
 
 | Name | Value |
 |---|---|
-| `DOTENV_PUBLIC_KEY_PROD` | Isi `DOTENV_PUBLIC_KEY_PROD` dari file `.env.keys` di PC |
+| `DOTENV_PRIVATE_KEY_PROD` | Isi `DOTENV_PRIVATE_KEY_PROD` dari file `.env.keys` di PC |
 
 ### 2. Install Self-hosted Runner
 
