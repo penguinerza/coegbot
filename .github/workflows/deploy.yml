@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: self-hosted
@@ -12,7 +19,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Write .env.keys
-        run: echo "DOTENV_PRIVATE_KEY_PRODUCTION=${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}" > .env.keys
+        run: |
+          echo "DOTENV_PRIVATE_KEY_PROD=${{ secrets.DOTENV_PRIVATE_KEY_PROD }}" > .env.keys
+          chmod 600 .env.keys
 
       - name: Build & deploy
         run: |
