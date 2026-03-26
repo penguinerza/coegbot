@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    command: ["npx", "dotenvx", "run", "-f", ".env.prod", "--", "node", "src/index.js"]
+    env_file:
+      - .env.keys
+    volumes:
+      - ./.env.prod:/app/.env.prod:ro
+      - bot-data:/app/data
+
+volumes:
+  bot-data:

@@ -1,0 +1,16 @@
+{
+  "name": "coegbot",
+  "version": "1.0.0",
+  "description": "A Discord bot built with discord.js",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy": "node src/deploy.js"
+  },
+  "dependencies": {
+    "@dotenvx/dotenvx": "^1.57.2",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7"
+  }
+}
