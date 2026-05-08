@@ -4,6 +4,41 @@ const { getKaniList, checkKani, addKani, addKaniBulk, removeKani, toggleFavorite
 const pending = new Map(); // id -> { guildId, name, series }
 
 const owner = process.env.RAJA_KANI;
+const PAGE_SIZE = 10;
+
+function buildListPage(entries, guildId, page) {
+  const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const start = page * PAGE_SIZE;
+  const slice = entries.slice(start, start + PAGE_SIZE);
+
+  const formatted = slice
+    .map((e, i) => {
+      const star = e.favorite ? '⭐ ' : '';
+      return `${start + i + 1}. ${star}**${e.name}**`;
+    })
+    .join('\n');
+
+  const content = `**List ${entries.length} Kani ${owner}** (${page + 1}/${totalPages})\n${formatted}`;
+
+  const components = [];
+  if (totalPages > 1) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`kanilist_${guildId}_${page - 1}`)
+        .setLabel('◀ Prev')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page === 0),
+      new ButtonBuilder()
+        .setCustomId(`kanilist_${guildId}_${page + 1}`)
+        .setLabel('Next ▶')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= totalPages - 1),
+    );
+    components.push(row);
+  }
+
+  return { content, components };
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -40,6 +75,14 @@ module.exports = {
         .addStringOption((opt) =>
           opt.setName('nama').setDescription('Nama kani').setRequired(true).setAutocomplete(true)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('cek')
+        .setDescription(`Cek apakah kani ada di daftar ${owner}.`)
+        .addStringOption((opt) =>
+          opt.setName('nama').setDescription('Nama kani yang mau dicek').setRequired(true)
+        )
     ),
 
   async autocomplete(interaction) {
@@ -59,7 +102,23 @@ module.exports = {
   },
 
   async handleButton(interaction) {
-    const [action, id] = interaction.customId.split('_');
+    const parts = interaction.customId.split('_');
+    const action = parts[0];
+
+    if (action === 'kanilist') {
+      const targetGuildId = parts[1];
+      const page = parseInt(parts[2]);
+      const entries = getKaniList(targetGuildId);
+      if (!entries.length) {
+        await interaction.update({ content: `Daftar kani ${owner} masih kosong.`, components: [] });
+        return;
+      }
+      const { content, components } = buildListPage(entries, targetGuildId, page);
+      await interaction.update({ content, components });
+      return;
+    }
+
+    const id = parts[1];
     const entry = pending.get(id);
     if (!entry) {
       await interaction.update({ content: 'Konfirmasi udah kedaluwarsa.', components: [] });
@@ -116,13 +175,8 @@ module.exports = {
       if (!entries.length) {
         await interaction.reply(`Daftar kani ${owner} masih kosong.`);
       } else {
-        const formatted = entries
-          .map((e, i) => {
-            const star = e.favorite ? '⭐ ' : '';
-            return `${i + 1}. ${star}**${e.name}**`;
-          })
-          .join('\n');
-        await interaction.reply(`**List ${entries.length} Kani ${owner}**\n${formatted}`);
+        const { content, components } = buildListPage(entries, guildId, 0);
+        await interaction.reply({ content, components });
       }
     }
 
@@ -184,6 +238,20 @@ module.exports = {
         await interaction.reply(`**${result.entry.name}** kani favorit ${owner} coy, mana bisa dihapus😭`);
       } else {
         await interaction.reply(`**${result.entry.name}** dihapus dari daftar kaninya ${owner}.`);
+      }
+    }
+
+    if (sub === 'cek') {
+      const name = interaction.options.getString('nama');
+      const { duplicate, similar } = checkKani(guildId, name);
+      if (duplicate) {
+        const star = duplicate.favorite ? '⭐ ' : '';
+        await interaction.reply({ content: `✅ **${name}** ada di daftar kaninya ${owner}. (${star}${duplicate.name})`, ephemeral: true });
+      } else if (similar.length > 0) {
+        const similarList = similar.map(e => `- ${e.favorite ? '⭐ ' : ''}**${e.name}**`).join('\n');
+        await interaction.reply({ content: `❌ **${name}** ga ada, tapi ada yang mirip:\n${similarList}`, ephemeral: true });
+      } else {
+        await interaction.reply({ content: `❌ **${name}** ga ada di daftar kaninya ${owner}.`, ephemeral: true });
       }
     }
 

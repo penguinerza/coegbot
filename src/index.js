@@ -29,7 +29,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
       const [action, id, extra] = interaction.customId.split('_');
 
-      if (action === 'kaniconfirm' || action === 'kanibatal') {
+      if (action === 'kaniconfirm' || action === 'kanibatal' || action === 'kanilist') {
         await client.commands.get('kani').handleButton(interaction);
         return;
       }
