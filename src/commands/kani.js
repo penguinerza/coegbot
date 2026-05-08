@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getKaniList, checkKani, addKani, removeKani, toggleFavorite } = require('../services/lists');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { getKaniList, checkKani, addKani, addKaniBulk, removeKani, toggleFavorite } = require('../services/lists');
 
 const pending = new Map(); // id -> { guildId, name, series }
 
@@ -19,9 +19,11 @@ module.exports = {
         .addStringOption((opt) =>
           opt.setName('nama').setDescription('Nama kani').setRequired(true)
         )
-        .addStringOption((opt) =>
-          opt.setName('seri').setDescription('Nama seri').setRequired(false)
-        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('tambah-massal')
+        .setDescription(`Tambah banyak kani sekaligus ke daftar kaninya ${owner}.`)
     )
     .addSubcommand((sub) =>
       sub
@@ -47,9 +49,8 @@ module.exports = {
 
     const choices = entries
       .map((e, i) => {
-        const label = e.series ? `${e.name} — ${e.series}` : e.name;
         const prefix = sub === 'fav' ? (e.favorite ? '⭐ ' : '') : '';
-        return { name: `${prefix}${label}`, value: String(i + 1) };
+        return { name: `${prefix}${e.name}`, value: String(i + 1) };
       })
       .filter((c) => c.name.toLowerCase().includes(focused))
       .slice(0, 25);
@@ -70,15 +71,40 @@ module.exports = {
       return;
     }
     // kaniconfirm
-    const { guildId, name, series } = entry;
-    const seriesText = series ? ` dari **${series}**` : '';
-    const result = await addKani(guildId, name, series);
+    const { guildId, name } = entry;
+    const result = await addKani(guildId, name);
     if (!result.added) {
-      await interaction.update({ content: `**${name}**${seriesText} udah ada di daftar.`, components: [] });
+      await interaction.update({ content: `**${name}** udah ada di daftar.`, components: [] });
       return;
     }
     await interaction.update({ content: 'Oke, ditambah!', components: [] });
-    await interaction.followUp(`**${name}**${seriesText} udah ditambah ke daftar kaninya ${owner}. (total: ${result.total})`);
+    await interaction.followUp(`**${name}** udah ditambah ke daftar kaninya ${owner}. (total: ${result.total})`);
+  },
+
+  async handleModal(interaction) {
+    const raw = interaction.fields.getTextInputValue('kani_daftar');
+    const names = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!names.length) {
+      await interaction.reply({ content: 'Daftarnya kosong.', ephemeral: true });
+      return;
+    }
+
+    const { results, total } = await addKaniBulk(interaction.guildId, names);
+    const added = results.filter(r => r.added);
+    const skipped = results.filter(r => !r.added);
+
+    const lines_out = [];
+    if (added.length) {
+      lines_out.push(`**${added.length} kani ditambah:**`);
+      added.forEach(r => lines_out.push(`+ ${r.name}`));
+    }
+    if (skipped.length) {
+      lines_out.push(`**${skipped.length} kani dilewat (duplikat):**`);
+      skipped.forEach(r => lines_out.push(`- ${r.name}`));
+    }
+    lines_out.push(`\nTotal daftar kani ${owner}: **${total}**`);
+
+    await interaction.reply(lines_out.join('\n'));
   },
 
   async execute(interaction) {
@@ -93,48 +119,60 @@ module.exports = {
         const formatted = entries
           .map((e, i) => {
             const star = e.favorite ? '⭐ ' : '';
-            const series = e.series ? ` — ${e.series}` : '';
-            return `${i + 1}. ${star}**${e.name}**${series}`;
+            return `${i + 1}. ${star}**${e.name}**`;
           })
           .join('\n');
         await interaction.reply(`**List ${entries.length} Kani ${owner}**\n${formatted}`);
       }
     }
 
+    if (sub === 'tambah-massal') {
+      const modal = new ModalBuilder()
+        .setCustomId('kanitambahmassal')
+        .setTitle(`Tambah Banyak Kani ${owner}`);
+      const input = new TextInputBuilder()
+        .setCustomId('kani_daftar')
+        .setLabel('Satu kani per baris')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Aqua\nRem\nNagato')
+        .setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      await interaction.showModal(modal);
+      return;
+    }
+
     if (sub === 'tambah') {
       const name = interaction.options.getString('nama');
-      const series = interaction.options.getString('seri') ?? null;
-      const seriesText = series ? ` dari **${series}**` : '';
-      const { duplicate, similar } = checkKani(guildId, name, series);
+      const { duplicate, similar } = checkKani(guildId, name);
 
       if (duplicate) {
-        await interaction.reply({ content: `**${name}**${seriesText} udah ada di daftar.`, ephemeral: true });
+        await interaction.reply({ content: `**${name}** udah ada di daftar.`, ephemeral: true });
         return;
       }
 
       if (similar.length > 0) {
         const id = Date.now().toString();
-        pending.set(id, { guildId, name, series });
+        pending.set(id, { guildId, name });
         setTimeout(() => pending.delete(id), 5 * 60 * 1000);
-        const similarList = similar.map(e => e.series ? `**${e.name}** — ${e.series}` : `**${e.name}**`).join('\n');
+        const similarList = similar.map(e => `**${e.name}**`).join('\n');
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`kaniconfirm_${id}`).setLabel('Tambah').setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId(`kanibatal_${id}`).setLabel('Batal').setStyle(ButtonStyle.Danger),
         );
         await interaction.reply({
-          content: `Ada nama yang mirip:\n${similarList}\n\nTetap tambah **${name}**${seriesText}?`,
+          content: `Ada nama yang mirip:\n${similarList}\n\nTetap tambah **${name}**?`,
           components: [row],
           ephemeral: true,
         });
         return;
       }
 
-      const result = await addKani(guildId, name, series);
+      const result = await addKani(guildId, name);
       if (!result.added) {
-        await interaction.reply({ content: `**${name}**${seriesText} udah ada di daftar.`, ephemeral: true });
+        await interaction.reply({ content: `**${name}** udah ada di daftar.`, ephemeral: true });
         return;
       }
-      await interaction.reply(`**${name}**${seriesText} udah ditambah ke daftar kaninya ${owner}. (total: ${result.total})`);
+      await interaction.reply(`**${name}** udah ditambah ke daftar kaninya ${owner}. (total: ${result.total})`);
     }
 
     if (sub === 'hapus') {
@@ -145,8 +183,7 @@ module.exports = {
       } else if (result.blocked) {
         await interaction.reply(`**${result.entry.name}** kani favorit ${owner} coy, mana bisa dihapus😭`);
       } else {
-        const seriesText = result.entry.series ? ` dari **${result.entry.series}**` : '';
-        await interaction.reply(`**${result.entry.name}**${seriesText} dihapus dari daftar kaninya ${owner}.`);
+        await interaction.reply(`**${result.entry.name}** dihapus dari daftar kaninya ${owner}.`);
       }
     }
 

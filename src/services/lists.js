@@ -30,43 +30,32 @@ function getKaniList(guildId) {
   return getSortedList(guildId);
 }
 
-function checkSimilar(list, name, series) {
+function checkSimilar(list, name) {
   const normName = name.toLowerCase().trim();
-  const normSeries = series?.toLowerCase().trim() ?? null;
 
-  const duplicate = list.find(e => {
-    const sameName = e.name.toLowerCase() === normName;
-    const sameSeries = (e.series?.toLowerCase() ?? null) === normSeries;
-    return sameName && sameSeries;
-  });
+  const duplicate = list.find(e => e.name.toLowerCase() === normName);
 
   const similar = list.filter(e => {
     if (duplicate && e === duplicate) return false;
     const eName = e.name.toLowerCase();
-    const nameSimilar = eName.includes(normName) || normName.includes(eName);
-    const eSeries = e.series?.toLowerCase() ?? null;
-    const seriesSimilar = normSeries && eSeries && (eSeries.includes(normSeries) || normSeries.includes(eSeries));
-    return nameSimilar || seriesSimilar;
+    return eName.includes(normName) || normName.includes(eName);
   });
 
   return { duplicate, similar };
 }
 
-function checkKani(guildId, name, series) {
-  return checkSimilar(getGuildList(guildId), name, series);
+function checkKani(guildId, name) {
+  return checkSimilar(getGuildList(guildId), name);
 }
 
-function addKani(guildId, name, series) {
+function addKani(guildId, name) {
   return mutex.run(() => {
     const data = load();
     const list = data[guildId] ?? [];
     const normName = name.toLowerCase().trim();
-    const normSeries = series?.toLowerCase().trim() ?? null;
-    const duplicate = list.find(e => {
-      return e.name.toLowerCase() === normName && (e.series?.toLowerCase() ?? null) === normSeries;
-    });
+    const duplicate = list.find(e => e.name.toLowerCase() === normName);
     if (duplicate) return { added: false, duplicate };
-    list.push({ name, series, favorite: false });
+    list.push({ name, favorite: false });
     data[guildId] = list;
     save(data);
     return { added: true, total: list.length };
@@ -82,7 +71,7 @@ function removeKani(guildId, index) {
 
     const data = load();
     const list = data[guildId] ?? [];
-    const realIndex = list.findIndex(e => e.name === target.name && e.series === target.series);
+    const realIndex = list.findIndex(e => e.name === target.name);
     const [removed] = list.splice(realIndex, 1);
     data[guildId] = list;
     save(data);
@@ -98,7 +87,7 @@ function toggleFavorite(guildId, index) {
 
     const data = load();
     const list = data[guildId] ?? [];
-    const realIndex = list.findIndex(e => e.name === target.name && e.series === target.series);
+    const realIndex = list.findIndex(e => e.name === target.name);
     list[realIndex].favorite = !list[realIndex].favorite;
     data[guildId] = list;
     save(data);
@@ -106,4 +95,27 @@ function toggleFavorite(guildId, index) {
   });
 }
 
-module.exports = { getKaniList, checkKani, addKani, removeKani, toggleFavorite };
+function addKaniBulk(guildId, names) {
+  return mutex.run(() => {
+    const data = load();
+    const list = data[guildId] ?? [];
+    const results = [];
+
+    for (const name of names) {
+      const normName = name.toLowerCase().trim();
+      const duplicate = list.find(e => e.name.toLowerCase() === normName);
+      if (duplicate) {
+        results.push({ name, added: false });
+      } else {
+        list.push({ name, favorite: false });
+        results.push({ name, added: true });
+      }
+    }
+
+    data[guildId] = list;
+    save(data);
+    return { results, total: list.length };
+  });
+}
+
+module.exports = { getKaniList, checkKani, addKani, addKaniBulk, removeKani, toggleFavorite };

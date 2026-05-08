@@ -75,6 +75,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  if (interaction.isModalSubmit()) {
+    try {
+      if (interaction.customId === 'kanitambahmassal') {
+        await client.commands.get('kani').handleModal(interaction);
+      }
+    } catch (err) {
+      console.error(`[ERROR] Modal handler: ${err.stack}`);
+    }
+    return;
+  }
+
   if (interaction.isAutocomplete()) {
     const command = client.commands.get(interaction.commandName);
     if (command?.autocomplete) await command.autocomplete(interaction);
