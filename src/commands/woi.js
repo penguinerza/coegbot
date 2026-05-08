@@ -3,13 +3,24 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('woi')
-    .setDescription('Spam ping seseorang 10x.')
+    .setDescription('Spam ping seseorang atau role 10x.')
     .addUserOption((opt) =>
-      opt.setName('user').setDescription('User yang mau di-ping').setRequired(true)
+      opt.setName('user').setDescription('User yang mau di-ping').setRequired(false)
+    )
+    .addRoleOption((opt) =>
+      opt.setName('role').setDescription('Role yang mau di-ping').setRequired(false)
     ),
 
   async execute(interaction) {
-    const target = interaction.options.getUser('user');
+    const user = interaction.options.getUser('user');
+    const role = interaction.options.getRole('role');
+
+    if (!user && !role) {
+      await interaction.reply({ content: 'Pilih minimal satu: `user` atau `role`.', ephemeral: true });
+      return;
+    }
+
+    const target = user ? `${user}` : `<@&${role.id}>`;
 
     await interaction.reply(`oke, siap bang 🫡`);
 

@@ -10,9 +10,7 @@ module.exports = {
       .setTitle('Daftar Perintah')
       .setColor(0x0099ff)
       .addFields(
-        { name: '/absen', value: 'Cek apakah bot hadir.' },
         { name: '/danbooru', value: 'Ambil gambar acak dari Danbooru (SFW).' },
-        { name: '/gas', value: 'Jadwalkan ping mabar. Parameter: `waktu` (HH:MM), `timezone` (opsional).' },
         { name: '/kani tambah', value: `Tambah kani ke daftar kaninya ${process.env.RAJA_KANI}.` },
         { name: '/kani list', value: `Lihat semua isi daftar kaninya ${process.env.RAJA_KANI}.` },
         { name: '/pilih', value: 'Bot milihkan salah satu dari opsi yang dikasih (maks. 5).' },

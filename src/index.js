@@ -2,7 +2,6 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Events, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { startScheduler, updateRsvp, cancelAgenda, getAgenda } = require('./services/scheduler');
 const { castVote, getVoting, closeVoting } = require('./services/voting');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -23,7 +22,6 @@ client.once(Events.ClientReady, async (c) => {
   } catch (err) {
     console.error(`[ERROR] deploy: ${err.message}`);
   }
-  startScheduler(client);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -36,10 +34,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      const gasCmd = client.commands.get('gas');
-      const { buildEmbed, buildButtons, buildCancelButton } = gasCmd;
       const votingCmd = client.commands.get('voting');
-      const { buildVotingEmbed, buildVotingButtons, buildCloseButton } = votingCmd;
+      const { buildVotingEmbed, buildVotingButtons } = votingCmd;
 
       if (action === 'vote') {
         const voting = await castVote(id, interaction.user.id, parseInt(extra));
@@ -73,39 +69,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      const agendaId = id;
-
-      if (action === 'batal') {
-        const agenda = getAgenda(agendaId);
-        if (!agenda) {
-          await interaction.reply({ content: 'Agenda udah kedaluwarsa.', ephemeral: true });
-          return;
-        }
-        if (agenda.createdById && agenda.createdById !== interaction.user.id) {
-          await interaction.reply({ content: 'Cuma yang buat agenda yang bisa batalin.', ephemeral: true });
-          return;
-        }
-        await cancelAgenda(agendaId);
-        const embed = buildEmbed(agenda.timeStr, agenda.tz, agenda.createdBy, agenda.confirmed, agenda.declined, true);
-        await interaction.update({ content: 'Agenda dibatalkan.', components: [] });
-        if (agenda.messageId) {
-          const channel = await interaction.guild.channels.fetch(agenda.channelId);
-          const publicMsg = await channel.messages.fetch(agenda.messageId).catch(() => null);
-          if (publicMsg) await publicMsg.edit({ embeds: [embed], components: [buildButtons(agendaId, true)] });
-        }
-        return;
-      }
-
-      if (action !== 'hadir' && action !== 'tidak') return;
-
-      const agenda = await updateRsvp(agendaId, interaction.user.id, action);
-      if (!agenda) {
-        await interaction.reply({ content: 'Agenda udah kedaluwarsa.', ephemeral: true });
-        return;
-      }
-
-      const embed = buildEmbed(agenda.timeStr, agenda.tz, agenda.createdBy, agenda.confirmed, agenda.declined);
-      await interaction.update({ embeds: [embed] });
     } catch (err) {
       console.error(`[ERROR] Button handler: ${err.stack}`);
     }
